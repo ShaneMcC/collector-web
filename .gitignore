@@ -1,0 +1,5 @@
+vendor/
+templates_c/
+config.local.php
+templates/dev/*
+data/

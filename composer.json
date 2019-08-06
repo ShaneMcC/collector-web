@@ -1,0 +1,13 @@
+{
+    "name": "shanemcc/collector-web",
+    "description": "Web Frontend for probe graphs",
+    "type": "project",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Shane Mc Cormack",
+            "email": "shanemcc@gmail.com"
+        }
+    ],
+    "require": {}
+}
