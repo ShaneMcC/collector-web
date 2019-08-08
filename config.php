@@ -6,6 +6,19 @@
 	/** Path to rrdtool binary. */
 	$config['rrdtool'] = '/usr/bin/rrdtool';
 
+
+	/**
+	 * influxdb database details.
+	 *
+	 * If Host is blank, no data will be sent to influx, otherwise a copy of
+	 * all data will go to influx as well as RRD.
+	 */
+	$config['influx']['host'] = getEnvOrDefault('INFLUX_HOST', '');
+	$config['influx']['port'] = getEnvOrDefault('INFLUX_PORT', '8086');
+	$config['influx']['user'] = getEnvOrDefault('INFLUX_USER', '');
+	$config['influx']['pass'] = getEnvOrDefault('INFLUX_PASS', '');
+	$config['influx']['db'] = getEnvOrDefault('INFLUX_DB', 'collector-web');
+
 	/** Detailed errors in submit? */
 	$config['collector']['rrd']['detailedErrors'] = false;
 

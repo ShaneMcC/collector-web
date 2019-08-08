@@ -26,6 +26,16 @@
 	// Check that we have RRD Tool.
 	if (!file_exists($config['rrdtool'])) { die(json_encode(array('error' => 'Internal Error'))); }
 
+	// Check if we have Influx
+	if (!empty($config['influx']['host'])) {
+		$influxClient = new InfluxDB\Client($config['influx']['host'], $config['influx']['port']);
+		$influxDatabase = $influxClient->selectDB($config['influx']['db']);
+		if (!$influxDatabase->exists()) { $influxDatabase->create(); }
+	} else {
+		$influxClient = NULL;
+		$influxDatabase = NULL;
+	}
+
 
 	$postdata = file_get_contents("php://input");
 	$data = @json_decode($postdata, true);
@@ -57,6 +67,16 @@
 
 			if (!file_exists($rrdDataFile)) { createRRD($rrdDataFile, $dsname, $dstype, $data['time']); }
 			if (!file_exists($rrdDataFile)) { die(json_encode(array('error' => 'Internal Error'))); }
+
+			if ($influxClient != null) {
+				$point = new InfluxDB\Point('value',
+					                        (int)$storeValue,
+					                        ['type' => $dsname, 'location' => $data['location'], 'serial' => $dev['serial']],
+					                        [],
+					                        $data['time']
+					                       );
+				$influxDatabase->writePoint($point, InfluxDB\Database::PRECISION_SECONDS);
+			}
 
 			$result = updateRRD($rrdDataFile, $dsname, $data['time'], $storeValue);
 			if (startsWith($result['stdout'], 'ERROR:')) {

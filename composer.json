@@ -9,5 +9,7 @@
             "email": "shanemcc@gmail.com"
         }
     ],
-    "require": {}
+    "require": {
+        "influxdb/influxdb-php": "^1.15"
+    }
 }
