@@ -75,7 +75,7 @@
 					                        [],
 					                        $data['time']
 					                       );
-				$influxDatabase->writePoint($point, InfluxDB\Database::PRECISION_SECONDS);
+				$influxDatabase->writePoints([$point], InfluxDB\Database::PRECISION_SECONDS);
 			}
 
 			$result = updateRRD($rrdDataFile, $dsname, $data['time'], $storeValue);
