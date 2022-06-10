@@ -1,8 +1,6 @@
 <?php
 	require_once(dirname(__FILE__) . '/../functions.php');
 
-	die(json_encode(array('success' => 'ok')));
-
 	// Check for authentication.
 	//
 	// Username == location
@@ -94,7 +92,9 @@
 					                        [],
 					                        $data['time']
 					                       );
-				$influxDatabase->writePoints([$point], InfluxDB\Database::PRECISION_SECONDS);
+				if (!$influxDatabase->writePoints([$point], InfluxDB\Database::PRECISION_SECONDS)) {
+					die(json_encode(array('error' => 'Internal Error')));
+				}
 			}
 
 			if ($hasRRD) {
