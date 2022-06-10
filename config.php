@@ -23,6 +23,7 @@
 	$config['collector']['rrd']['detailedErrors'] = false;
 
 	/** Valid datatypes to accept. */
+	/** Either an array of types to accept, or true to accept everything as GAUGE */
 	$config['collector']['datatypes'] = [];
 
 	/** Power data from wemo probe. */

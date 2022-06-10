@@ -1,6 +1,8 @@
 <?php
 	require_once(dirname(__FILE__) . '/../functions.php');
 
+	die(json_encode(array('success' => 'ok')));
+
 	// Check for authentication.
 	//
 	// Username == location
@@ -24,7 +26,14 @@
 	}
 
 	// Check that we have RRD Tool.
-	if (!file_exists($config['rrdtool'])) { die(json_encode(array('error' => 'Internal Error'))); }
+	$hasRRD = false;
+	if (!empty($config['rrdtool'])) {
+		if (file_exists($config['rrdtool'])) {
+			$hasRRD = true;
+		} else {
+			die(json_encode(array('error' => 'Internal Error')));
+		}
+	}
 
 	// Check if we have Influx
 	if (!empty($config['influx']['host'])) {
@@ -45,17 +54,25 @@
 	foreach ($data['devices'] as $dev) {
 		$dev['serial'] = preg_replace('#[^A-Z0-9-_ ]#', '', strtoupper($dev['serial']));
 
-		$rrdDir = $config['data'] . '/rrd/' . $data['location'] . '/' . $dev['serial'];
-		if (!file_exists($rrdDir)) { mkdir($rrdDir, 0755, true); }
-		if (!file_exists($rrdDir)) { die(json_encode(array('error' => 'Internal Error'))); }
+		if ($hasRRD) {
+			$rrdDir = $config['data'] . '/rrd/' . $data['location'] . '/' . $dev['serial'];
+			if (!file_exists($rrdDir)) { mkdir($rrdDir, 0755, true); }
+			if (!file_exists($rrdDir)) { die(json_encode(array('error' => 'Internal Error'))); }
 
-		$meta = $dev;
-		unset($meta['data']);
-		@file_put_contents($rrdDir . '/meta.js', json_encode($meta));
+			$meta = $dev;
+			unset($meta['data']);
+			@file_put_contents($rrdDir . '/meta.js', json_encode($meta));
+		}
 
 		foreach ($dev['data'] as $dataPoint => $dataValue) {
-			if (!isset($config['collector']['datatypes'][$dataPoint])) { continue; }
-			$conf = $config['collector']['datatypes'][$dataPoint];
+			if (is_array($config['collector']['datatypes'])) {
+				if (!isset($config['collector']['datatypes'][$dataPoint])) { continue; }
+				$conf = $config['collector']['datatypes'][$dataPoint];
+			} else if ($config['collector']['datatypes'] === true) {
+				$conf = ['rrd' => ['type' => 'GAUGE'], 'type' => 'any'];
+			} else {
+				continue;
+			}
 
 			$dsname = $dataPoint;
 			// Assume Gauge unless otherwise specified.
@@ -65,29 +82,33 @@
 
 			$rrdDataFile = $rrdDir . '/' . $dsname . '.rrd';
 
-			if (!file_exists($rrdDataFile)) { createRRD($rrdDataFile, $dsname, $dstype, $data['time']); }
-			if (!file_exists($rrdDataFile)) { die(json_encode(array('error' => 'Internal Error'))); }
+			if ($hasRRD) {
+				if (!file_exists($rrdDataFile)) { createRRD($rrdDataFile, $dsname, $dstype, $data['time']); }
+				if (!file_exists($rrdDataFile)) { die(json_encode(array('error' => 'Internal Error'))); }
+			}
 
 			if ($influxClient != null) {
 				$point = new InfluxDB\Point('value',
 					                        (int)$storeValue,
-					                        ['type' => $dsname, 'location' => $data['location'], 'serial' => $dev['serial']],
+					                        ['type' => $dsname, 'location' => $data['location'], 'serial' => $dev['serial'], 'name' => $dev['name']],
 					                        [],
 					                        $data['time']
 					                       );
 				$influxDatabase->writePoints([$point], InfluxDB\Database::PRECISION_SECONDS);
 			}
 
-			$result = updateRRD($rrdDataFile, $dsname, $data['time'], $storeValue);
-			if (startsWith($result['stdout'], 'ERROR:')) {
-				// Strip path from the error along with new line
-				$errorNoPath = substr($result['stdout'], strrpos($result['stdout'], ":") + 2, -1);
+			if ($hasRRD) {
+				$result = updateRRD($rrdDataFile, $dsname, $data['time'], $storeValue);
+				if (startsWith($result['stdout'], 'ERROR:')) {
+					// Strip path from the error along with new line
+					$errorNoPath = substr($result['stdout'], strrpos($result['stdout'], ":") + 2, -1);
 
-				// Check if the error is to do with illegal timestamp
-				if ($config['collector']['rrd']['detailedErrors'] || startsWith($errorNoPath, "illegal attempt to update using time")) {
-					die(json_encode(array('error' => $errorNoPath)));
-				} else {
-					die(json_encode(array('error' => 'Internal Error')));
+					// Check if the error is to do with illegal timestamp
+					if ($config['collector']['rrd']['detailedErrors'] || startsWith($errorNoPath, "illegal attempt to update using time")) {
+						die(json_encode(array('error' => $errorNoPath)));
+					} else {
+						die(json_encode(array('error' => 'Internal Error')));
+					}
 				}
 			}
 		}
