@@ -45,69 +45,77 @@
 
 
 	$postdata = file_get_contents("php://input");
-	$data = @json_decode($postdata, true);
-	if ($data === null) { die(json_encode(array('error' => 'Invalid Data'))); }
-	$data['location'] = preg_replace('#[^a-z0-9-_ ]#', '', strtolower($location));
+	$indata = @json_decode($postdata, true);
+	if ($indata === null) { die(json_encode(array('error' => 'Invalid Data'))); }
 
-	foreach ($data['devices'] as $dev) {
-		$dev['serial'] = preg_replace('#[^A-Z0-9-_ ]#', '', strtoupper($dev['serial']));
+	if (isset($indata['time'])) {
+		// Non bulk, convert to bulk format
+		$indata = [$indata];
+	}
 
-		if ($hasRRD) {
-			$rrdDir = $config['data'] . '/rrd/' . $data['location'] . '/' . $dev['serial'];
-			if (!file_exists($rrdDir)) { mkdir($rrdDir, 0755, true); }
-			if (!file_exists($rrdDir)) { die(json_encode(array('error' => 'Internal Error'))); }
+	foreach ($indata as $data) {
+		$data['location'] = preg_replace('#[^a-z0-9-_ ]#', '', strtolower($location));
 
-			$meta = $dev;
-			unset($meta['data']);
-			@file_put_contents($rrdDir . '/meta.js', json_encode($meta));
-		}
-
-		foreach ($dev['data'] as $dataPoint => $dataValue) {
-			if (is_array($config['collector']['datatypes'])) {
-				if (!isset($config['collector']['datatypes'][$dataPoint])) { continue; }
-				$conf = $config['collector']['datatypes'][$dataPoint];
-			} else if ($config['collector']['datatypes'] === true) {
-				$conf = ['rrd' => ['type' => 'GAUGE'], 'type' => 'any'];
-			} else {
-				continue;
-			}
-
-			$dsname = $dataPoint;
-			// Assume Gauge unless otherwise specified.
-			$dstype = isset($conf['rrd']['type']) ? $conf['rrd']['type'] : 'GAUGE';
-
-			$storeValue = $dataValue;
-
-			$rrdDataFile = $rrdDir . '/' . $dsname . '.rrd';
+		foreach ($data['devices'] as $dev) {
+			$dev['serial'] = preg_replace('#[^A-Z0-9-_ ]#', '', strtoupper($dev['serial']));
 
 			if ($hasRRD) {
-				if (!file_exists($rrdDataFile)) { createRRD($rrdDataFile, $dsname, $dstype, $data['time']); }
-				if (!file_exists($rrdDataFile)) { die(json_encode(array('error' => 'Internal Error'))); }
+				$rrdDir = $config['data'] . '/rrd/' . $data['location'] . '/' . $dev['serial'];
+				if (!file_exists($rrdDir)) { mkdir($rrdDir, 0755, true); }
+				if (!file_exists($rrdDir)) { die(json_encode(array('error' => 'Internal Error'))); }
+
+				$meta = $dev;
+				unset($meta['data']);
+				@file_put_contents($rrdDir . '/meta.js', json_encode($meta));
 			}
 
-			if ($influxClient != null) {
-				$point = new InfluxDB\Point('value',
-					                        (int)$storeValue,
-					                        ['type' => $dsname, 'location' => $data['location'], 'serial' => $dev['serial'], 'name' => $dev['name']],
-					                        [],
-					                        $data['time']
-					                       );
-				if (!$influxDatabase->writePoints([$point], InfluxDB\Database::PRECISION_SECONDS)) {
-					die(json_encode(array('error' => 'Internal Error')));
+			foreach ($dev['data'] as $dataPoint => $dataValue) {
+				if (is_array($config['collector']['datatypes'])) {
+					if (!isset($config['collector']['datatypes'][$dataPoint])) { continue; }
+					$conf = $config['collector']['datatypes'][$dataPoint];
+				} else if ($config['collector']['datatypes'] === true) {
+					$conf = ['rrd' => ['type' => 'GAUGE'], 'type' => 'any'];
+				} else {
+					continue;
 				}
-			}
 
-			if ($hasRRD) {
-				$result = updateRRD($rrdDataFile, $dsname, $data['time'], $storeValue);
-				if (startsWith($result['stdout'], 'ERROR:')) {
-					// Strip path from the error along with new line
-					$errorNoPath = substr($result['stdout'], strrpos($result['stdout'], ":") + 2, -1);
+				$dsname = $dataPoint;
+				// Assume Gauge unless otherwise specified.
+				$dstype = isset($conf['rrd']['type']) ? $conf['rrd']['type'] : 'GAUGE';
 
-					// Check if the error is to do with illegal timestamp
-					if ($config['collector']['rrd']['detailedErrors'] || startsWith($errorNoPath, "illegal attempt to update using time")) {
-						die(json_encode(array('error' => $errorNoPath)));
-					} else {
+				$storeValue = $dataValue;
+
+				$rrdDataFile = $rrdDir . '/' . $dsname . '.rrd';
+
+				if ($hasRRD) {
+					if (!file_exists($rrdDataFile)) { createRRD($rrdDataFile, $dsname, $dstype, $data['time']); }
+					if (!file_exists($rrdDataFile)) { die(json_encode(array('error' => 'Internal Error'))); }
+				}
+
+				if ($influxClient != null) {
+					$point = new InfluxDB\Point('value',
+						                        (int)$storeValue,
+						                        ['type' => $dsname, 'location' => $data['location'], 'serial' => $dev['serial'], 'name' => $dev['name']],
+						                        [],
+						                        $data['time']
+						                       );
+					if (!$influxDatabase->writePoints([$point], InfluxDB\Database::PRECISION_SECONDS)) {
 						die(json_encode(array('error' => 'Internal Error')));
+					}
+				}
+
+				if ($hasRRD) {
+					$result = updateRRD($rrdDataFile, $dsname, $data['time'], $storeValue);
+					if (startsWith($result['stdout'], 'ERROR:')) {
+						// Strip path from the error along with new line
+						$errorNoPath = substr($result['stdout'], strrpos($result['stdout'], ":") + 2, -1);
+
+						// Check if the error is to do with illegal timestamp
+						if ($config['collector']['rrd']['detailedErrors'] || startsWith($errorNoPath, "illegal attempt to update using time")) {
+							die(json_encode(array('error' => $errorNoPath)));
+						} else {
+							die(json_encode(array('error' => 'Internal Error')));
+						}
 					}
 				}
 			}
