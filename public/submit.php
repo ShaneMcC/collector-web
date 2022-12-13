@@ -85,9 +85,9 @@
 
 				$storeValue = $dataValue;
 
-				$rrdDataFile = $rrdDir . '/' . $dsname . '.rrd';
-
 				if ($hasRRD) {
+					$rrdDataFile = $rrdDir . '/' . $dsname . '.rrd';
+
 					if (!file_exists($rrdDataFile)) { createRRD($rrdDataFile, $dsname, $dstype, $data['time']); }
 					if (!file_exists($rrdDataFile)) { die(json_encode(array('error' => 'Internal Error'))); }
 				}
