@@ -35,7 +35,7 @@
 
 	// Check if we have Influx
 	if (!empty($config['influx']['host'])) {
-		$influxClient = new InfluxDB\Client($config['influx']['host'], $config['influx']['port']);
+		$influxClient = new InfluxDB\Client($config['influx']['host'], $config['influx']['port'], $config['influx']['user'], $config['influx']['pass']);
 		$influxDatabase = $influxClient->selectDB($config['influx']['db']);
 		if (!$influxDatabase->exists()) { $influxDatabase->create(); }
 	} else {
