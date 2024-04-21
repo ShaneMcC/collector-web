@@ -9,7 +9,7 @@
 		die(json_encode(['error' => 'No influx host found.']));
 	}
 
-	$influxClient = new InfluxDB\Client($config['influx']['host'], $config['influx']['port']);
+	$influxClient = new InfluxDB\Client($config['influx']['host'], $config['influx']['port'], $config['influx']['user'], $config['influx']['pass']);
 	$influxDatabase = $influxClient->selectDB($config['influx']['db']);
 	if (!$influxDatabase->exists()) {
 		die(json_encode(['error' => 'No influx db found.']));
