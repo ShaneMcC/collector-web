@@ -93,18 +93,21 @@
 				}
 
 				if ($influxClient != null) {
-					$tags = $dev['tags'] ?? [];
-					$tags['type'] = $dsname;
-					$tags['location'] = $data['location'];
-					$tags['serial'] = $data['serial'];
-					$tags['name'] = $data['name'];
+					$tags = ['type' => $dsname, 'location' => $data['location'], 'serial' => $dev['serial'], 'name' => $dev['name']];
+					if (isset($dev['tags'])) {
+						foreach ($dev['tags'] as $k => $v) {
+							if (!isset($tags[$k])) {
+								$tags[$k] = (string)$v;
+							}
+						}
+					}
 
 					$point = new InfluxDB\Point('value',
-						                        (int)$storeValue,
-						                        $tags,
-						                        [],
-						                        $data['time']
-						                       );
+					                            (int)$storeValue,
+					                            $tags,
+					                            [],
+					                            $data['time']
+					                           );
 					if (!$influxDatabase->writePoints([$point], InfluxDB\Database::PRECISION_SECONDS)) {
 						die(json_encode(array('error' => 'Internal Error')));
 					}
