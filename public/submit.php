@@ -93,9 +93,15 @@
 				}
 
 				if ($influxClient != null) {
+					$tags = $dev['tags'] ?? [];
+					$tags['type'] = $dsname;
+					$tags['location'] = $data['location'];
+					$tags['serial'] = $data['serial'];
+					$tags['name'] = $data['name'];
+
 					$point = new InfluxDB\Point('value',
 						                        (int)$storeValue,
-						                        ['type' => $dsname, 'location' => $data['location'], 'serial' => $dev['serial'], 'name' => $dev['name']],
+						                        $tags,
 						                        [],
 						                        $data['time']
 						                       );
